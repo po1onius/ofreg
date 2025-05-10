@@ -2,7 +2,6 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include <string.h>
 
 #define MAX_PATH_LEN 128
 
@@ -23,12 +22,28 @@ struct {
 
 struct commit _export = {};
 
+static bool is_target_dir(const char *path) {
+    // char fmt1[] = "+++%s+++\n";
+    // char fmt2[] = "---%s---\n";
+    // bpf_trace_printk(fmt1, sizeof(fmt1), target_dir);
+    // bpf_trace_printk(fmt2, sizeof(fmt2), path);
+    for (u32 i = 0; i < MAX_PATH_LEN; ++i) {
+        if (target_dir[i] == '\0') {
+            return true;
+        }
+        if (path[i] == '\0' || path[i] != target_dir[i]) {
+            return false;
+        }
+    }
+    return false;
+}
+
 SEC("fentry/__x64_sys_openat")
 int BPF_PROG(open_file_fentry, struct pt_regs *regs) {
     char op_file_path_buf[MAX_PATH_LEN] = {};
     bpf_core_read_user(op_file_path_buf, MAX_PATH_LEN, PT_REGS_PARM2(regs));
 
-    if (strstr(op_file_path_buf, target_dir) != op_file_path_buf) {
+    if (!is_target_dir(op_file_path_buf)) {
         return 0;
     }
 
