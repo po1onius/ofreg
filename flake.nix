@@ -30,11 +30,10 @@
             nativeBuildInputs = [
               pkg-config
               clang-tools
-              llvmPackages.clang
+              llvmPackages.clang-unwrapped
               linuxHeaders
               elfutils
               zlib
-              glibc_multi
               (rust-bin.nightly.latest.default.override {
                 extensions = [
                   "rust-src"
@@ -44,9 +43,7 @@
             ];
             buildInputs = [
               libbpf
-            ];
-            hardeningDisable = [
-              "zerocallusedregs"
+              sqlite
             ];
             LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
             shellHook = ''
