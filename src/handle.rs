@@ -1,5 +1,6 @@
 use std::{fs::File, io::Read};
 
+use crate::db::{DbOp, OFREG_DB, OfregData};
 use crate::types::commit;
 
 pub fn handle(data: &[u8]) -> i32 {
@@ -14,5 +15,13 @@ pub fn handle(data: &[u8]) -> i32 {
         "pid: {}\nstart time: {}\nfilename: {}\ncommand: {}",
         commit.pid, commit.exec_ts, op_file_path, exe_file_path
     );
+
+    let data = OfregData {
+        cmd: exe_file_path,
+        op_file: op_file_path,
+        time: commit.exec_ts.to_string(),
+    };
+    OFREG_DB.lock().unwrap().insert_item(&data);
+
     0
 }

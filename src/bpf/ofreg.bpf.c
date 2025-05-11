@@ -58,8 +58,9 @@ int BPF_PROG(open_file_fentry, struct pt_regs *regs) {
     if (!commit) {
         return 0;
     }
+    
     commit->pid = bpf_get_current_pid_tgid() >> 32;
-    commit->exec_ts = bpf_ktime_get_ns();
+    commit->exec_ts = BPF_CORE_READ(task, start_time);
     __builtin_memcpy(commit->op_file_path, op_file_path_buf, MAX_PATH_LEN);
     bpf_core_read_str(commit->exe_file_path, MAX_PATH_LEN, name);
     bpf_ringbuf_submit(commit, 0);

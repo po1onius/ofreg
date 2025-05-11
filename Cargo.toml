@@ -2,6 +2,15 @@
 name = "ofreg"
 version = "0.1.0"
 edition = "2024"
+default-run = "ofregd"
+
+[[bin]]
+name = "ofregd"
+path = "src/main.rs"
+
+[[bin]]
+name = "ofreg"
+path = "src/cli.rs"
 
 [dependencies]
 libbpf-rs = "0.24"
