@@ -1,23 +1,12 @@
-[package]
-name = "ofreg"
+[workspace]
+members = ["ofregd", "ofreg"]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-default-run = "ofregd"
 
-[[bin]]
-name = "ofregd"
-path = "src/main.rs"
-
-[[bin]]
-name = "ofreg"
-path = "src/cli.rs"
-
-[dependencies]
-libbpf-rs = "0.24"
+[workspace.dependencies]
 anyhow = "1.0"
-plain = "0.2"
 rusqlite = "0.35"
 
-[build-dependencies]
-libbpf-cargo = "0.24"
-vmlinux = { git = "https://github.com/libbpf/vmlinux.h.git", rev = "83a228cf37fc65f2d14e4896a04922b5ee531a94" }

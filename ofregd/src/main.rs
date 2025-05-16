@@ -22,7 +22,6 @@ mod ofreg {
 use ofreg::*;
 unsafe impl plain::Plain for types::commit {}
 
-mod distro;
 mod handle;
 use handle::handle;
 
