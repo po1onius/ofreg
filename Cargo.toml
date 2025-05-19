@@ -9,4 +9,4 @@ edition = "2024"
 [workspace.dependencies]
 anyhow = "1.0"
 rusqlite = "0.35"
-
+tokio = "1"

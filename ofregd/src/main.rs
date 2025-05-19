@@ -1,3 +1,13 @@
+mod handle;
+mod query;
+mod store;
+mod ofreg {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bpf/ofreg.skel.rs"
+    ));
+}
+
 use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
@@ -10,20 +20,9 @@ use libbpf_rs::{
     skel::{OpenSkel, Skel, SkelBuilder},
 };
 
-mod db;
-
-mod ofreg {
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/bpf/ofreg.skel.rs"
-    ));
-}
-
+use handle::handle;
 use ofreg::*;
 unsafe impl plain::Plain for types::commit {}
-
-mod handle;
-use handle::handle;
 
 fn main() -> Result<()> {
     let args = std::env::args();
