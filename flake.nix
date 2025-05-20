@@ -27,7 +27,7 @@
       {
         devShells.default =
           mkShell rec {
-            nativeBuildInputs = [
+            packages = [
               pkg-config
               clang-tools
               llvmPackages.clang-unwrapped
@@ -40,12 +40,10 @@
                   "rust-analyzer"
                 ];
               })
-            ];
-            buildInputs = [
               libbpf
               sqlite
             ];
-            LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
+            # LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
             shellHook = ''
               export PS1='\[\e[35m\][\w]\[\e[0m\]\$ '
             '';
