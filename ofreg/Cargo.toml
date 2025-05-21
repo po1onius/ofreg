@@ -3,3 +3,7 @@ name = "ofreg"
 version.workspace = true
 edition.workspace = true
 
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+ofreg-common = { workspace = true }

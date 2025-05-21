@@ -22,6 +22,7 @@ use libbpf_rs::{
 
 use handle::handle;
 use ofreg::*;
+use query::QuerySrv;
 unsafe impl plain::Plain for types::commit {}
 
 fn main() -> Result<()> {
@@ -30,6 +31,15 @@ fn main() -> Result<()> {
         println!("usage: ofreg <path>");
         return Err(Error::msg("error arg"));
     }
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.spawn(async {
+        let query_srv = QuerySrv::new_conn().await;
+        query_srv.srv().await;
+    });
 
     let target_dir = args.last().unwrap();
 

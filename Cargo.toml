@@ -1,5 +1,5 @@
 [workspace]
-members = ["ofregd", "ofreg"]
+members = ["ofregd", "ofreg", "ofreg-common"]
 resolver = "3"
 
 [workspace.package]
@@ -10,3 +10,4 @@ edition = "2024"
 anyhow = "1.0"
 rusqlite = "0.35"
 tokio = "1"
+ofreg-common = { version = "*", path = "ofreg-common" }

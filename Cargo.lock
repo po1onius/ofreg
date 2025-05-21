@@ -449,6 +449,14 @@ dependencies = [
 [[package]]
 name = "ofreg"
 version = "0.1.0"
+dependencies = [
+ "ofreg-common",
+ "tokio",
+]
+
+[[package]]
+name = "ofreg-common"
+version = "0.1.0"
 
 [[package]]
 name = "ofregd"
@@ -457,6 +465,8 @@ dependencies = [
  "anyhow",
  "libbpf-cargo",
  "libbpf-rs",
+ "nix",
+ "ofreg-common",
  "plain",
  "rusqlite",
  "serde",

@@ -1,6 +1,10 @@
+use nix::unistd::Group;
 use rusqlite::{ToSql, config::DbConfig};
 use serde_json::json;
-use std::fs;
+use std::{
+    fs,
+    os::unix::fs::{PermissionsExt, chown},
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixListener,
@@ -8,14 +12,15 @@ use tokio::{
 use tokio_rusqlite_new::Connection;
 
 use crate::store::*;
+use ofreg_common::SOCK_PATH;
 
 pub struct QuerySrv {
     db_conn: Connection,
 }
 
 impl QuerySrv {
-    async fn new_conn() -> Self {
-        let db_conn = Connection::open(DB).await.unwrap();
+    pub async fn new_conn() -> Self {
+        let db_conn = Connection::open(DB_FILE).await.unwrap();
         db_conn
             .call(|conn| {
                 conn.execute_batch(
@@ -32,17 +37,26 @@ impl QuerySrv {
     }
 
     pub async fn srv(&self) {
-        let socket_path = "/run/user/1000/ofreg.sock";
-        fs::remove_file(socket_path).ok();
-        let listener = UnixListener::bind(socket_path).unwrap();
+        fs::remove_file(SOCK_PATH).ok();
+        let listener = UnixListener::bind(SOCK_PATH).unwrap();
+
+        let user_group = Group::from_name("users").unwrap().unwrap();
+        chown(SOCK_PATH, None, Some(user_group.gid.into())).unwrap();
+        std::fs::set_permissions(SOCK_PATH, std::fs::Permissions::from_mode(0o660)).unwrap();
 
         loop {
             let (mut stream, _) = listener.accept().await.unwrap();
+            println!("new connection!");
             let db_conn = self.db_conn.clone();
             tokio::spawn(async move {
                 let payload_len = stream.read_u32().await.unwrap();
                 let mut buf = vec![0u8; payload_len as usize];
                 stream.read_exact(buf.as_mut_slice()).await.unwrap();
+                println!(
+                    "read {} bytes: {}",
+                    payload_len,
+                    str::from_utf8(buf.as_slice()).unwrap()
+                );
                 let result = db_conn
                     .call(move |conn| {
                         let mut stmt = conn.prepare(str::from_utf8(&buf).unwrap()).unwrap();

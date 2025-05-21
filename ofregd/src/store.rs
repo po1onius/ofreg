@@ -5,6 +5,7 @@ use std::{
     sync::{LazyLock, Mutex, OnceLock, RwLock},
 };
 
+use ofreg_common::TABLE_NAME;
 use rusqlite::Connection;
 
 #[derive(Debug, Serialize)]
@@ -14,10 +15,9 @@ pub struct OfregData {
     pub time: String,
 }
 
-pub const DB: &str = "/var/db/ofreg/ofreg.db";
+pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
 pub const DB_PATH: &str = "/var/db/ofreg";
-const DB_IGNORE: [&str; 2] = ["/var/db/ofreg/ofreg.db", "/var/db/ofreg/ofreg.db-journal"];
-pub const TABLE_NAME: &str = "ofreg";
+const DB_IGNORE: [&str; 1] = ["/var/db/ofreg"];
 
 pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
     let conn = db_open();
@@ -53,7 +53,7 @@ pub fn db_open() -> Connection {
     if !db_path.exists() {
         std::fs::create_dir_all(db_path);
     }
-    let conn_w = Connection::open(DB).unwrap();
+    let conn_w = Connection::open(DB_FILE).unwrap();
     conn_w
         .execute_batch(
             "PRAGMA journal_mode=WAL;
