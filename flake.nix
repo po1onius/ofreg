@@ -26,7 +26,7 @@
       with pkgs;
       {
         devShells.default =
-          mkShell rec {
+          mkShell {
             packages = [
               pkg-config
               clang-tools
