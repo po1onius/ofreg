@@ -19,6 +19,9 @@ use libbpf_rs::{
     RingBufferBuilder,
     skel::{OpenSkel, Skel, SkelBuilder},
 };
+use tracing::info;
+use tracing_appender::rolling;
+use tracing_subscriber::fmt;
 
 use handle::handle;
 use ofreg::*;
@@ -26,10 +29,18 @@ use query::QuerySrv;
 unsafe impl plain::Plain for types::commit {}
 
 fn main() -> Result<()> {
+    let file_appender = rolling::daily("logs", "app.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking) // 输出到文件
+        .init();
+
+    info!("ofregd start...");
+
     let args = std::env::args();
     if args.len() != 2 {
-        println!("usage: ofreg <path>");
-        return Err(Error::msg("error arg"));
+        panic!("usage: ofreg <path>");
     }
 
     let rt = tokio::runtime::Builder::new_multi_thread()

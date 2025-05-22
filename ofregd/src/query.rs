@@ -10,6 +10,7 @@ use tokio::{
     net::UnixListener,
 };
 use tokio_rusqlite_new::Connection;
+use tracing::{error, info, warn};
 
 use crate::store::*;
 use ofreg_common::SOCK_PATH;
@@ -20,8 +21,12 @@ pub struct QuerySrv {
 
 impl QuerySrv {
     pub async fn new_conn() -> Self {
-        let db_conn = Connection::open(DB_FILE).await.unwrap();
-        db_conn
+        let db_conn = Connection::open(DB_FILE)
+            .await
+            .map_err(|e| error!("db open connection error: {}", e.to_string()))
+            .unwrap();
+
+        let _ = db_conn
             .call(|conn| {
                 conn.execute_batch(
                     "PRAGMA journal_mode=WAL;
@@ -31,28 +36,55 @@ impl QuerySrv {
                 )
             })
             .await
-            .unwrap();
+            .map_err(|e| {
+                warn!(
+                    "db connection init settings error, may cause performance matter: {}",
+                    e.to_string()
+                )
+            });
+
+        info!("db connect and init");
 
         Self { db_conn }
     }
 
     pub async fn srv(&self) {
         fs::remove_file(SOCK_PATH).ok();
-        let listener = UnixListener::bind(SOCK_PATH).unwrap();
+        let listener = UnixListener::bind(SOCK_PATH)
+            .map_err(|_| error!("unix socket path bind error"))
+            .unwrap();
 
-        let user_group = Group::from_name("users").unwrap().unwrap();
-        chown(SOCK_PATH, None, Some(user_group.gid.into())).unwrap();
-        std::fs::set_permissions(SOCK_PATH, std::fs::Permissions::from_mode(0o660)).unwrap();
+        if let Ok(Some(user_group)) = Group::from_name("users") {
+            let _ = chown(SOCK_PATH, None, Some(user_group.gid.into()))
+                .map_err(|e| warn!("{}", e.to_string()));
+            let _ = std::fs::set_permissions(SOCK_PATH, std::fs::Permissions::from_mode(0o660))
+                .map_err(|e| warn!("{}", e.to_string()));
+        } else {
+            warn!("can't get \"users\" group info, it may cause ofreg cli can't work");
+        }
 
         loop {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            println!("new connection!");
+            let (mut stream, _) = listener
+                .accept()
+                .await
+                .map_err(|e| error!("{}", e.to_string()))
+                .unwrap();
+
             let db_conn = self.db_conn.clone();
             tokio::spawn(async move {
-                let payload_len = stream.read_u32().await.unwrap();
+                let payload_len = stream
+                    .read_u32()
+                    .await
+                    .map_err(|e| error!("{}", e.to_string()))
+                    .unwrap();
                 let mut buf = vec![0u8; payload_len as usize];
-                stream.read_exact(buf.as_mut_slice()).await.unwrap();
-                println!(
+                stream
+                    .read_exact(buf.as_mut_slice())
+                    .await
+                    .map_err(|e| error!("{}", e.to_string()))
+                    .unwrap();
+
+                info!(
                     "read {} bytes: {}",
                     payload_len,
                     str::from_utf8(buf.as_slice()).unwrap()
