@@ -2,7 +2,7 @@ use nix::unistd::Group;
 use rusqlite::{ToSql, config::DbConfig};
 use serde_json::json;
 use std::{
-    fs,
+    fs, io,
     os::unix::fs::{PermissionsExt, chown},
 };
 use tokio::{
@@ -84,32 +84,43 @@ impl QuerySrv {
                     .map_err(|e| error!("{}", e.to_string()))
                     .unwrap();
 
-                info!(
-                    "read {} bytes: {}",
-                    payload_len,
-                    str::from_utf8(buf.as_slice()).unwrap()
-                );
-                let result = db_conn
+                //info!("read {} bytes: {}", payload_len, query_str);
+
+                if let Ok(result) = db_conn
                     .call(move |conn| {
-                        let mut stmt = conn.prepare(str::from_utf8(&buf).unwrap()).unwrap();
+                        let query_str = str::from_utf8(buf.as_slice())?;
+                        let mut stmt = conn.prepare(query_str)?;
                         stmt.query_map([], |row| {
                             Ok(OfregData {
-                                cmd: row.get(0).unwrap(),
-                                op_file: row.get(1).unwrap(),
-                                time: row.get(2).unwrap(),
+                                cmd: row.get(0)?,
+                                op_file: row.get(1)?,
+                                time: row.get(2)?,
                             })
-                        })
-                        .unwrap()
+                        })?
                         .collect::<Result<Vec<OfregData>, rusqlite::Error>>()
                     })
                     .await
-                    .unwrap();
-                for item in result {
-                    let item_bin = json!(item).to_string();
-                    stream.write_u32(item_bin.len() as u32).await.unwrap();
-                    stream.write_all(item_bin.as_bytes()).await.unwrap();
+                {
+                    for item in result {
+                        let item_bin = json!(item).to_string();
+                        stream
+                            .write_u32(item_bin.len() as u32)
+                            .await
+                            .map_err(|e| {
+                                if e.kind() != std::io::ErrorKind::BrokenPipe {
+                                    e
+                                }
+                            })
+                            .unwrap();
+                        stream.write_all(item_bin.as_bytes()).await.unwrap();
+                    }
+                    stream.write_u32(0).await.unwrap();
+                } else {
+                    let query_err = "error query";
+                    stream.write_u32(query_err.len() as u32).await;
+                    stream.write_all(query_err.as_bytes()).await;
+                    stream.write_u32(0).await;
                 }
-                stream.write_u32(0).await.unwrap();
             });
         }
     }
