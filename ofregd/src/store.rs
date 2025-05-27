@@ -1,12 +1,12 @@
+use ofreg_common::TABLE_NAME;
+use rusqlite::Connection;
 use serde::Serialize;
 use std::{
     num::NonZero,
     str::FromStr,
     sync::{LazyLock, Mutex, OnceLock, RwLock},
 };
-
-use ofreg_common::TABLE_NAME;
-use rusqlite::Connection;
+use tracing::{error, warn};
 
 #[derive(Debug, Serialize)]
 pub struct OfregData {
@@ -51,10 +51,14 @@ fn is_ignore(path2: &str) -> bool {
 pub fn db_open() -> Connection {
     let db_path = std::path::Path::new(DB_PATH);
     if !db_path.exists() {
-        std::fs::create_dir_all(db_path);
+        std::fs::create_dir_all(db_path)
+            .map_err(|e| error!("{e}"))
+            .unwrap();
     }
-    let conn_w = Connection::open(DB_FILE).unwrap();
-    conn_w
+    let conn_w = Connection::open(DB_FILE)
+        .map_err(|e| error!("{e}"))
+        .unwrap();
+    let _ = conn_w
         .execute_batch(
             "PRAGMA journal_mode=WAL;
          PRAGMA synchronous=NORMAL;
@@ -62,7 +66,7 @@ pub fn db_open() -> Connection {
          PRAGMA busy_timeout=5000;
          PRAGMA foreign_keys=OFF;",
         )
-        .unwrap();
+        .map_err(|e| warn!("{e}"));
 
     let query_exist = format!(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{}'",
@@ -74,25 +78,28 @@ pub fn db_open() -> Connection {
     );
     let table_count = conn_w
         .query_row(&query_exist, (), |row| row.get::<_, i32>(0))
+        .map_err(|e| error!("{e}"))
         .unwrap();
     if table_count == 0 {
-        conn_w.execute(&create_table, ()).unwrap();
+        conn_w
+            .execute(&create_table, ())
+            .map_err(|e| error!("{e}"))
+            .unwrap();
     }
     conn_w
 }
 
 pub fn insert_item(conn: &Connection, item: &OfregData) {
-    for ignore_file in DB_IGNORE {
-        if is_ignore(&item.op_file) {
-            return;
-        }
+    if is_ignore(&item.op_file) {
+        return;
     }
     let insert = format!(
         "INSERT INTO {} (cmd, op_file, time) VALUES (?1, ?2, ?3)",
         TABLE_NAME
     );
-    conn.execute(&insert, (&item.cmd, &item.op_file, &item.time))
-        .unwrap();
+    let _ = conn
+        .execute(&insert, (&item.cmd, &item.op_file, &item.time))
+        .map_err(|e| warn!("item {:?} insert error: {e}", item));
 }
 
 #[cfg(test)]
