@@ -7,7 +7,7 @@ use std::{
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::UnixListener,
+    net::{UnixListener, UnixStream},
 };
 use tokio_rusqlite_new::Connection;
 use tracing::{error, info, warn};
@@ -103,25 +103,37 @@ impl QuerySrv {
                 {
                     for item in result {
                         let item_bin = json!(item).to_string();
-                        stream
-                            .write_u32(item_bin.len() as u32)
-                            .await
-                            .map_err(|e| {
-                                if e.kind() != std::io::ErrorKind::BrokenPipe {
-                                    e
-                                }
-                            })
-                            .unwrap();
-                        stream.write_all(item_bin.as_bytes()).await.unwrap();
+                        write_frame(&mut stream, item_bin.as_bytes()).await;
                     }
                     stream.write_u32(0).await.unwrap();
                 } else {
                     let query_err = "error query";
-                    stream.write_u32(query_err.len() as u32).await;
-                    stream.write_all(query_err.as_bytes()).await;
-                    stream.write_u32(0).await;
+                    write_frame(&mut stream, query_err.as_bytes()).await;
                 }
             });
         }
     }
+}
+
+trait IoErrHandle {
+    fn piperr(&self) {
+        panic!("custom unwrap");
+    }
+}
+
+impl<T> IoErrHandle for Result<T, io::Error> {
+    fn piperr(&self) {
+        if let Err(e) = self {
+            if e.kind() != io::ErrorKind::BrokenPipe {
+                error!("{e}");
+                panic!();
+            }
+            warn!("{e}");
+        }
+    }
+}
+
+async fn write_frame(stream: &mut UnixStream, data: &[u8]) {
+    stream.write_u32(data.len() as u32).await.piperr();
+    stream.write_all(data).await.piperr();
 }
