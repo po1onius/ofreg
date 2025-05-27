@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
     sync::{LazyLock, Mutex, OnceLock, RwLock},
 };
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Serialize)]
 pub struct OfregData {
@@ -54,6 +54,7 @@ pub fn db_open() -> Connection {
         std::fs::create_dir_all(db_path)
             .map_err(|e| error!("{e}"))
             .unwrap();
+        info!("create db path");
     }
     let conn_w = Connection::open(DB_FILE)
         .map_err(|e| error!("{e}"))
@@ -86,6 +87,7 @@ pub fn db_open() -> Connection {
             .map_err(|e| error!("{e}"))
             .unwrap();
     }
+    info!("open db write connection");
     conn_w
 }
 

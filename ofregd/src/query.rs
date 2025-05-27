@@ -84,9 +84,14 @@ impl QuerySrv {
                     .map_err(|e| error!("{}", e.to_string()))
                     .unwrap();
 
-                //info!("read {} bytes: {}", payload_len, query_str);
+                if let Ok(s) = str::from_utf8(buf.as_slice()) {
+                    info!("read {} bytes: {}", payload_len, s);
+                } else {
+                    warn!("cli send bad query cmd");
+                    return;
+                }
 
-                if let Ok(result) = db_conn
+                match db_conn
                     .call(move |conn| {
                         let query_str = str::from_utf8(buf.as_slice())?;
                         let mut stmt = conn.prepare(query_str)?;
@@ -101,14 +106,20 @@ impl QuerySrv {
                     })
                     .await
                 {
-                    for item in result {
-                        let item_bin = json!(item).to_string();
-                        write_frame(&mut stream, item_bin.as_bytes()).await;
+                    Ok(result) => {
+                        for item in result {
+                            let item_bin = json!(item).to_string();
+                            write_frame(&mut stream, item_bin.as_bytes()).await;
+                        }
+                        stream.write_u32(0).await.piperr();
+                        info!("response to cli query result");
                     }
-                    stream.write_u32(0).await.unwrap();
-                } else {
-                    let query_err = "error query";
-                    write_frame(&mut stream, query_err.as_bytes()).await;
+                    Err(e) => {
+                        warn!("{e}");
+                        let query_err = "error query";
+                        write_frame(&mut stream, query_err.as_bytes()).await;
+                        stream.write_u32(0).await.piperr();
+                    }
                 }
             });
         }

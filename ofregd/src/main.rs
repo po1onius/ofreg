@@ -19,7 +19,8 @@ use libbpf_rs::{
     RingBufferBuilder,
     skel::{OpenSkel, Skel, SkelBuilder},
 };
-use tracing::info;
+use nix::errno::Errno;
+use tracing::{error, info};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt;
 
@@ -28,7 +29,7 @@ use ofreg::*;
 use query::QuerySrv;
 unsafe impl plain::Plain for types::commit {}
 
-fn main() -> Result<()> {
+fn main() {
     let file_appender = rolling::daily("logs", "app.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
@@ -46,23 +47,27 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
+        .map_err(|e| error!("{e}"))
         .unwrap();
     rt.spawn(async {
         let query_srv = QuerySrv::new_conn().await;
         query_srv.srv().await;
     });
 
-    let target_dir = args.last().unwrap();
+    let target_dir = args.last().ok_or_else(|| error!("arg error")).unwrap();
 
     let skel_builder = OfregSkelBuilder::default();
     let mut open_object = MaybeUninit::uninit();
-    let open_skel = skel_builder.open(&mut open_object)?;
+    let open_skel = skel_builder
+        .open(&mut open_object)
+        .map_err(|e| error!("{e}"))
+        .unwrap();
 
     let target_dir = unsafe { CStr::from_ptr(target_dir.as_ptr() as *const i8) };
 
     open_skel.maps.rodata_data.target_dir = unsafe { *(target_dir.as_ptr() as *const [i8; 128]) };
 
-    let mut skel = open_skel.load()?;
+    let mut skel = open_skel.load().map_err(|e| error!("{e}")).unwrap();
 
     let mut commit_builder = RingBufferBuilder::new();
     commit_builder
@@ -71,7 +76,7 @@ fn main() -> Result<()> {
 
     let commit = commit_builder.build().expect("failed to build ringbuf");
 
-    skel.attach()?;
+    skel.attach().map_err(|e| error!("{e}")).unwrap();
 
     loop {
         let n = commit.poll_raw(Duration::MAX);
@@ -79,5 +84,4 @@ fn main() -> Result<()> {
             break;
         }
     }
-    Ok(())
 }
