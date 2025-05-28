@@ -1,4 +1,5 @@
-use ofreg_common::{SOCK_PATH, TABLE_NAME};
+use ofreg_common::{OfregData, SOCK_PATH, TABLE_NAME};
+use tabled::Table;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
@@ -13,13 +14,19 @@ async fn main() {
     stream.write_u32(select.len() as u32).await.unwrap();
     stream.write_all(select.as_bytes()).await.unwrap();
 
+    let mut ofreg_data_vec = Vec::new();
+
     loop {
         let item_len = stream.read_u32().await.unwrap();
         if item_len == 0 {
-            return;
+            break;
         }
         let mut buf = vec![0; item_len as usize];
         stream.read_exact(buf.as_mut_slice()).await.unwrap();
-        println!("{}", str::from_utf8(buf.as_slice()).unwrap());
+        let data = serde_json::from_slice::<OfregData>(buf.as_slice()).unwrap();
+        ofreg_data_vec.push(data);
     }
+
+    let table = Table::new(ofreg_data_vec);
+    println!("{table}");
 }

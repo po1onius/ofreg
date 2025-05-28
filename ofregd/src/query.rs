@@ -13,7 +13,7 @@ use tokio_rusqlite_new::Connection;
 use tracing::{error, info, warn};
 
 use crate::store::*;
-use ofreg_common::SOCK_PATH;
+use ofreg_common::{OfregData, SOCK_PATH};
 
 pub struct QuerySrv {
     db_conn: Connection,

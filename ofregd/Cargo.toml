@@ -10,13 +10,12 @@ anyhow = { workspace = true }
 rusqlite = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-rusqlite-new = { git = "https://github.com/xuxiaocheng0201/tokio-rusqlite" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 ofreg-common = { workspace = true }
 nix = { version = "*", features = ["user"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 libbpf-cargo = "0.24"

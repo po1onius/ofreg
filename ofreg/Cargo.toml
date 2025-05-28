@@ -7,3 +7,5 @@ edition.workspace = true
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
 ofreg-common = { workspace = true }
+serde_json = { workspace = true }
+tabled = { workspace = true }

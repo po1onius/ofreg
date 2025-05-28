@@ -14,3 +14,5 @@ ofreg-common = { version = "*", path = "ofreg-common" }
 tracing = "*"
 tracing-subscriber = "*"
 tracing-appender = "*"
+serde_json = "*"
+tabled = "*"

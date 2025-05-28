@@ -1,19 +1,11 @@
-use ofreg_common::TABLE_NAME;
+use ofreg_common::{OfregData, TABLE_NAME};
 use rusqlite::Connection;
-use serde::Serialize;
 use std::{
     num::NonZero,
     str::FromStr,
     sync::{LazyLock, Mutex, OnceLock, RwLock},
 };
 use tracing::{error, info, warn};
-
-#[derive(Debug, Serialize)]
-pub struct OfregData {
-    pub cmd: String,
-    pub op_file: String,
-    pub time: String,
-}
 
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
 pub const DB_PATH: &str = "/var/db/ofreg";

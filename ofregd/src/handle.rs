@@ -1,8 +1,9 @@
 use std::{fs::File, io::Read};
 use tracing::error;
 
-use crate::store::{OFREG_DB, OfregData, insert_item};
+use crate::store::{OFREG_DB, insert_item};
 use crate::types::commit;
+use ofreg_common::OfregData;
 
 pub fn handle(data: &[u8]) -> i32 {
     let commit = plain::from_bytes::<commit>(data)

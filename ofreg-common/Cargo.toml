@@ -4,3 +4,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+serde = { version = "*", features = ["derive"] }
+tabled = { workspace = true }
