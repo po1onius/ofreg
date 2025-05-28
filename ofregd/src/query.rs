@@ -23,7 +23,7 @@ impl QuerySrv {
     pub async fn new_conn() -> Self {
         let db_conn = Connection::open(DB_FILE)
             .await
-            .map_err(|e| error!("db open connection error: {}", e.to_string()))
+            .map_err(|e| error!("db open connection error: {}", e))
             .unwrap();
 
         let _ = db_conn

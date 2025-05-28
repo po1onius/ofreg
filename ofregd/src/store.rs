@@ -8,7 +8,6 @@ use std::{
 use tracing::{error, info, warn};
 
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
-pub const DB_PATH: &str = "/var/db/ofreg";
 const DB_IGNORE: [&str; 1] = ["/var/db/ofreg"];
 
 pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
@@ -41,13 +40,6 @@ fn is_ignore(path2: &str) -> bool {
 }
 
 pub fn db_open() -> Connection {
-    let db_path = std::path::Path::new(DB_PATH);
-    if !db_path.exists() {
-        std::fs::create_dir_all(db_path)
-            .map_err(|e| error!("{e}"))
-            .unwrap();
-        info!("create db path");
-    }
     let conn_w = Connection::open(DB_FILE)
         .map_err(|e| error!("{e}"))
         .unwrap();
@@ -85,6 +77,7 @@ pub fn db_open() -> Connection {
 
 pub fn insert_item(conn: &Connection, item: &OfregData) {
     if is_ignore(&item.op_file) {
+        print!("ignore: {}", item.op_file);
         return;
     }
     let insert = format!(

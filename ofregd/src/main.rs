@@ -24,12 +24,14 @@ use tracing::{error, info};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt;
 
+use ofreg_common::DB_PATH;
+
 use handle::handle;
 use ofreg::*;
 use query::QuerySrv;
 unsafe impl plain::Plain for types::commit {}
 
-fn main() {
+fn init_log() {
     let file_appender = rolling::daily("logs", "app.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
@@ -38,24 +40,9 @@ fn main() {
         .init();
 
     info!("ofregd start...");
+}
 
-    let args = std::env::args();
-    if args.len() != 2 {
-        panic!("usage: ofreg <path>");
-    }
-
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| error!("{e}"))
-        .unwrap();
-    rt.spawn(async {
-        let query_srv = QuerySrv::new_conn().await;
-        query_srv.srv().await;
-    });
-
-    let target_dir = args.last().ok_or_else(|| error!("arg error")).unwrap();
-
+fn ebpf_load_run(target_dir: &str) {
     let skel_builder = OfregSkelBuilder::default();
     let mut open_object = MaybeUninit::uninit();
     let open_skel = skel_builder
@@ -84,4 +71,39 @@ fn main() {
             break;
         }
     }
+}
+
+fn db_file_init() {
+    let db_path = std::path::Path::new(DB_PATH);
+    if !db_path.exists() {
+        std::fs::create_dir_all(db_path)
+            .map_err(|e| error!("{e}"))
+            .unwrap();
+        info!("create db path");
+    }
+}
+
+fn main() {
+    init_log();
+
+    db_file_init();
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| error!("{e}"))
+        .unwrap();
+    rt.spawn(async {
+        let query_srv = QuerySrv::new_conn().await;
+        query_srv.srv().await;
+    });
+
+    let args = std::env::args();
+    if args.len() != 2 {
+        panic!("usage: ofreg <path>");
+    }
+
+    let target_dir = args.last().ok_or_else(|| error!("arg error")).unwrap();
+
+    ebpf_load_run(target_dir.as_str());
 }
