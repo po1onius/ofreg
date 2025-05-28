@@ -7,6 +7,8 @@ use std::{
 };
 use tracing::{error, info, warn};
 
+use crate::utils::time::jeff2time;
+
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
 const DB_IGNORE: [&str; 1] = ["/var/db/ofreg"];
 
@@ -80,12 +82,13 @@ pub fn insert_item(conn: &Connection, item: &OfregData) {
         print!("ignore: {}", item.op_file);
         return;
     }
+    let time = jeff2time(item.time.parse::<u64>().unwrap());
     let insert = format!(
         "INSERT INTO {} (cmd, op_file, time) VALUES (?1, ?2, ?3)",
         TABLE_NAME
     );
     let _ = conn
-        .execute(&insert, (&item.cmd, &item.op_file, &item.time))
+        .execute(&insert, (&item.cmd, &item.op_file, time))
         .map_err(|e| warn!("item {:?} insert error: {e}", item));
 }
 

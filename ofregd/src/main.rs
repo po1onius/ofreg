@@ -1,6 +1,7 @@
 mod handle;
 mod query;
 mod store;
+mod utils;
 mod ofreg {
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
