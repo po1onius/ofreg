@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow};
 use nix::unistd::Group;
 use rusqlite::{ToSql, config::DbConfig};
 use serde_json::json;
@@ -20,11 +21,11 @@ pub struct QuerySrv {
 }
 
 impl QuerySrv {
-    pub async fn new_conn() -> Self {
-        let db_conn = Connection::open(DB_FILE)
-            .await
-            .map_err(|e| error!("db open connection error: {}", e))
-            .unwrap();
+    pub async fn new_conn() -> Result<Self> {
+        let db_conn = Connection::open(DB_FILE).await.map_err(|e| {
+            warn!("db open connection error: {}", e);
+            anyhow!("")
+        })?;
 
         let _ = db_conn
             .call(|conn| {
@@ -45,7 +46,7 @@ impl QuerySrv {
 
         info!("db connect and init");
 
-        Self { db_conn }
+        Ok(Self { db_conn })
     }
 
     pub async fn srv(&self) {

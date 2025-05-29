@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow};
 use ofreg_common::{OfregData, TABLE_NAME};
 use rusqlite::Connection;
 use std::{
@@ -13,7 +14,9 @@ pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
 const DB_IGNORE: [&str; 1] = ["/var/db/ofreg"];
 
 pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
-    let conn = db_open();
+    let conn = db_open()
+        .map_err(|_| error!("connection open error"))
+        .unwrap();
     Mutex::new(conn)
 });
 
@@ -41,10 +44,11 @@ fn is_ignore(path2: &str) -> bool {
     return false;
 }
 
-pub fn db_open() -> Connection {
-    let conn_w = Connection::open(DB_FILE)
-        .map_err(|e| error!("{e}"))
-        .unwrap();
+pub fn db_open() -> Result<Connection> {
+    let conn_w = Connection::open(DB_FILE).map_err(|e| {
+        warn!("{e}");
+        anyhow!("")
+    })?;
     let _ = conn_w
         .execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -65,24 +69,33 @@ pub fn db_open() -> Connection {
     );
     let table_count = conn_w
         .query_row(&query_exist, (), |row| row.get::<_, i32>(0))
-        .map_err(|e| error!("{e}"))
-        .unwrap();
+        .map_err(|e| {
+            warn!("{e}");
+            anyhow!("")
+        })?;
     if table_count == 0 {
-        conn_w
-            .execute(&create_table, ())
-            .map_err(|e| error!("{e}"))
-            .unwrap();
+        conn_w.execute(&create_table, ()).map_err(|e| {
+            warn!("{e}");
+            anyhow!("")
+        })?;
     }
     info!("open db write connection");
-    conn_w
+    Ok(conn_w)
 }
 
-pub fn insert_item(conn: &Connection, item: &OfregData) {
+pub fn insert_item(conn: &Connection, item: &OfregData) -> Result<()> {
     if is_ignore(&item.op_file) {
         print!("ignore: {}", item.op_file);
-        return;
+        return Ok(());
     }
-    let time = jeff2time(item.time.parse::<u64>().unwrap());
+    let time = jeff2time(item.time.parse::<u64>().map_err(|e| {
+        warn!("start_time -> u64 error: {e}");
+        anyhow!("")
+    })?)
+    .map_err(|e| {
+        warn!("");
+        anyhow!("")
+    })?;
     let insert = format!(
         "INSERT INTO {} (cmd, op_file, time) VALUES (?1, ?2, ?3)",
         TABLE_NAME
@@ -90,6 +103,7 @@ pub fn insert_item(conn: &Connection, item: &OfregData) {
     let _ = conn
         .execute(&insert, (&item.cmd, &item.op_file, time))
         .map_err(|e| warn!("item {:?} insert error: {e}", item));
+    Ok(())
 }
 
 #[cfg(test)]

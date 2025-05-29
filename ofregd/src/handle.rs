@@ -29,7 +29,7 @@ pub fn handle(data: &[u8]) -> i32 {
         .lock()
         .map_err(|_| error!("sqlite write connect lock fetch error"))
         .unwrap();
-    insert_item(&*conn, &data);
+    let _ = insert_item(&*conn, &data);
 
     0
 }

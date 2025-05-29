@@ -95,7 +95,10 @@ fn main() {
         .map_err(|e| error!("{e}"))
         .unwrap();
     rt.spawn(async {
-        let query_srv = QuerySrv::new_conn().await;
+        let query_srv = QuerySrv::new_conn()
+            .await
+            .map_err(|_| error!("read connection open error"))
+            .unwrap();
         query_srv.srv().await;
     });
 
