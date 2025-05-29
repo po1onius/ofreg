@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 use crate::utils::time::jeff2time;
 
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
-const DB_IGNORE: [&str; 1] = ["/var/db/ofreg"];
+const DB_IGNORE_PATH_PREFIX: [&str; 2] = ["/var/db/ofreg/", "/var/cache/fontconfig/"];
 
 pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
     let conn = db_open()
@@ -21,24 +21,11 @@ pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
 });
 
 fn is_ignore(path2: &str) -> bool {
-    for ignore_path in DB_IGNORE {
-        let path = std::path::Path::new(ignore_path);
-        if path.exists() {
-            if path.is_dir() {
-                let mut path_endwith_slash = String::from(ignore_path);
-                if ignore_path.chars().last() != Some('/') {
-                    path_endwith_slash.push_str("/");
-                }
-                if let Some(idx) = path2.find(path_endwith_slash.as_str())
-                    && idx == 0
-                {
-                    return true;
-                }
-            } else {
-                if ignore_path == path2 {
-                    return true;
-                }
-            }
+    for ignore_path in DB_IGNORE_PATH_PREFIX {
+        if let Some(idx) = path2.find(ignore_path)
+            && idx == 0
+        {
+            return true;
         }
     }
     return false;
@@ -85,7 +72,7 @@ pub fn db_open() -> Result<Connection> {
 
 pub fn insert_item(conn: &Connection, item: &OfregData) -> Result<()> {
     if is_ignore(&item.op_file) {
-        print!("ignore: {}", item.op_file);
+        //print!("ignore: {}", item.op_file);
         return Ok(());
     }
     let time = jeff2time(item.time.parse::<u64>().map_err(|e| {
