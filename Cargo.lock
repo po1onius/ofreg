@@ -590,6 +590,7 @@ dependencies = [
 name = "ofreg"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "ofreg-common",
  "serde_json",
  "tabled",
