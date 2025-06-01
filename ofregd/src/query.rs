@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Error, Result, anyhow};
 use nix::unistd::Group;
 use rusqlite::{ToSql, config::DbConfig};
 use serde_json::json;
@@ -93,32 +93,20 @@ impl QuerySrv {
                 }
 
                 match db_conn
-                    .call(move |conn| {
-                        let query_str = str::from_utf8(buf.as_slice())?;
-                        let mut stmt = conn.prepare(query_str)?;
-                        stmt.query_map([], |row| {
-                            Ok(OfregData {
-                                cmd: row.get(0)?,
-                                op_file: row.get(1)?,
-                                time: row.get(2)?,
-                            })
-                        })?
-                        .collect::<Result<Vec<OfregData>, rusqlite::Error>>()
+                    .call(move |conn| -> Result<String, rusqlite::Error> {
+                        let query_str = str::from_utf8(buf.as_slice()).unwrap();
+                        let s: String = conn.query_row(query_str, [], |row| row.get(0))?;
+                        Ok(s)
                     })
                     .await
                 {
                     Ok(result) => {
-                        for item in result {
-                            let item_bin = json!(item).to_string();
-                            write_frame(&mut stream, item_bin.as_bytes()).await;
-                        }
+                        write_frame(&mut stream, result.as_bytes()).await;
                         stream.write_u32(0).await.piperr();
                         info!("response to cli query result");
                     }
                     Err(e) => {
                         warn!("{e}");
-                        let query_err = "error query";
-                        write_frame(&mut stream, query_err.as_bytes()).await;
                         stream.write_u32(0).await.piperr();
                     }
                 }
