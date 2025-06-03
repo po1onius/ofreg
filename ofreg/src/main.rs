@@ -24,49 +24,72 @@ struct Args {
     n: u32,
 }
 
-fn print_json_array(json_str: &str) {
+const KEYS: [&str; 3] = ["cmd", "op_file", "time"];
+
+fn table_fmt(json_str: &str, select: Option<&str>) {
     let data: Vec<Value> = serde_json::from_str(json_str).unwrap();
     let mut builder = Builder::default();
 
-    // 添加表头
-    builder.push_record(vec!["Key", "Value"]);
+    let t = if let Some(s) = select { s } else { "" };
+    let table_header = KEYS
+        .iter()
+        .filter(|&&s| s != t)
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
 
-    // 动态解析每个对象
+    builder.push_record(table_header);
+
     for obj in data {
         if let Value::Object(map) = obj {
-            for (key, val) in map {
+            let mut vs = Vec::new();
+            for (_, val) in map {
                 let value_str = match val {
                     Value::String(s) => s.clone(),
                     _ => val.to_string(),
                 };
-                builder.push_record(vec![key, value_str]);
+                vs.push(value_str);
             }
+            builder.push_record(vs);
         }
     }
 
     println!("{}", builder.build());
 }
 
+fn select_stmt(target: Option<&str>) -> String {
+    let t = if let Some(s) = target { s } else { "" };
+    let show_filed = KEYS
+        .iter()
+        .map(|&s| s.to_string())
+        .filter(|s| s != t)
+        .map(|s| format!("'{}',{}", s, s))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let select = format!(
+        "select json_group_array(json_object({})) FROM {} LIMIT 10",
+        show_filed, TABLE_NAME
+    );
+    return select;
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
 
-    let mut select = format!("SELECT * FROM {} LIMIT 10", TABLE_NAME);
+    let mut select = select_stmt(None);
+    let mut select_target = None;
     if let Some(cmd) = args.cmd {
-        select = format!(
-            "SELECT op_file, time FROM {} WHERE cmd = '{}' LIMIT 10",
-            TABLE_NAME, cmd
-        );
+        select = select_stmt(Some(cmd.as_str()));
+        select_target = Some("cmd");
     }
 
     if let Some(file) = args.file {
-        select = format!(
-            "SELECT cmd, time FROM {} WHERE op_file = '{}' LIMIT 10",
-            TABLE_NAME, file
-        );
+        select = select_stmt(Some(file.as_str()));
+        select_target = Some("op_file");
     }
 
-    let select = "select json_group_array(json_object('cmd', cmd, 'file', op_file)) from ofreg";
+    println!("{select}");
 
     let mut stream = UnixStream::connect(SOCK_PATH).await.unwrap();
     println!("{select}");
@@ -80,6 +103,6 @@ async fn main() {
         }
         let mut buf = vec![0; item_len as usize];
         stream.read_exact(buf.as_mut_slice()).await.unwrap();
-        print_json_array(str::from_utf8(buf.as_slice()).unwrap());
+        table_fmt(str::from_utf8(buf.as_slice()).unwrap(), select_target);
     }
 }
