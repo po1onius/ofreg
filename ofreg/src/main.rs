@@ -26,14 +26,13 @@ struct Args {
 
 const KEYS: [&str; 3] = ["cmd", "op_file", "time"];
 
-fn table_fmt(json_str: &str, select: Option<&str>) {
+fn table_fmt(json_str: &str, select: &str) {
     let data: Vec<Value> = serde_json::from_str(json_str).unwrap();
     let mut builder = Builder::default();
 
-    let t = if let Some(s) = select { s } else { "" };
     let table_header = KEYS
         .iter()
-        .filter(|&&s| s != t)
+        .filter(|&&s| s != select)
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
@@ -56,19 +55,23 @@ fn table_fmt(json_str: &str, select: Option<&str>) {
     println!("{}", builder.build());
 }
 
-fn select_stmt(target: Option<&str>) -> String {
-    let t = if let Some(s) = target { s } else { "" };
+fn select_stmt(target_flied: &str, target: &str) -> String {
     let show_filed = KEYS
         .iter()
         .map(|&s| s.to_string())
-        .filter(|s| s != t)
+        .filter(|s| s != target_flied)
         .map(|s| format!("'{}',{}", s, s))
         .collect::<Vec<_>>()
         .join(",");
 
+    let mut wheree = "".to_string();
+    if target != "" {
+        wheree = format!("where {} = '{}'", target_flied, target);
+    }
+
     let select = format!(
-        "select json_group_array(json_object({})) FROM {} LIMIT 10",
-        show_filed, TABLE_NAME
+        "select json_group_array(json_object({})) from {} {} LIMIT 10",
+        show_filed, TABLE_NAME, wheree
     );
     return select;
 }
@@ -77,22 +80,22 @@ fn select_stmt(target: Option<&str>) -> String {
 async fn main() {
     let args = Args::parse();
 
-    let mut select = select_stmt(None);
-    let mut select_target = None;
-    if let Some(cmd) = args.cmd {
-        select = select_stmt(Some(cmd.as_str()));
-        select_target = Some("cmd");
+    let mut select_target = "";
+    let mut target = "";
+    if let Some(cmd) = &args.cmd {
+        select_target = "cmd";
+        target = cmd.as_str();
     }
 
-    if let Some(file) = args.file {
-        select = select_stmt(Some(file.as_str()));
-        select_target = Some("op_file");
+    if let Some(file) = &args.file {
+        select_target = "op_file";
+        target = file.as_str();
     }
+    let select = select_stmt(select_target, target);
 
     println!("{select}");
 
     let mut stream = UnixStream::connect(SOCK_PATH).await.unwrap();
-    println!("{select}");
     stream.write_u32(select.len() as u32).await.unwrap();
     stream.write_all(select.as_bytes()).await.unwrap();
 
