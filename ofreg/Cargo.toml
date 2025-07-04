@@ -9,4 +9,7 @@ tokio = { workspace = true, features = ["full"] }
 ofreg-common = { workspace = true }
 serde_json = { workspace = true }
 tabled = { workspace = true }
-clap = {version = "*", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+chrono = "*"
+serde = { version = "*", features = ["derive"] }

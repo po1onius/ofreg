@@ -1,14 +1,8 @@
 use anyhow::{Result, anyhow};
 use ofreg_common::{OfregData, TABLE_NAME};
 use rusqlite::Connection;
-use std::{
-    num::NonZero,
-    str::FromStr,
-    sync::{LazyLock, Mutex, OnceLock, RwLock},
-};
+use std::sync::{LazyLock, Mutex};
 use tracing::{error, info, warn};
-
-use crate::utils::time::jeff2time;
 
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
 const DB_IGNORE_PATH_PREFIX: [&str; 2] = ["/var/db/ofreg/", "/var/cache/fontconfig/"];
@@ -51,7 +45,7 @@ pub fn db_open() -> Result<Connection> {
         TABLE_NAME
     );
     let create_table = format!(
-        "CREATE TABLE {} (cmd TEXT, op_file TEXT, time TEXT)",
+        "CREATE TABLE {} (cmd TEXT, op_file TEXT, time INTEGER)",
         TABLE_NAME
     );
     let table_count = conn_w
@@ -75,20 +69,13 @@ pub fn insert_item(conn: &Connection, item: &OfregData) -> Result<()> {
         //print!("ignore: {}", item.op_file);
         return Ok(());
     }
-    let time = jeff2time(item.time.parse::<u64>().map_err(|e| {
-        warn!("start_time -> u64 error: {e}");
-        anyhow!("")
-    })?)
-    .map_err(|e| {
-        warn!("");
-        anyhow!("")
-    })?;
+
     let insert = format!(
         "INSERT INTO {} (cmd, op_file, time) VALUES (?1, ?2, ?3)",
         TABLE_NAME
     );
     let _ = conn
-        .execute(&insert, (&item.cmd, &item.op_file, time))
+        .execute(&insert, (&item.cmd, &item.op_file, item.time))
         .map_err(|e| warn!("item {:?} insert error: {e}", item));
     Ok(())
 }
@@ -108,7 +95,7 @@ mod test {
         let ofreg_data = OfregData {
             cmd: "qq".into(),
             op_file: "/etc/sudoers".into(),
-            time: "2025-05-05 18:35:00".into(),
+            time: 11,
         };
 
         conn.execute(

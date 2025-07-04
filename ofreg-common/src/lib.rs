@@ -6,5 +6,19 @@ pub const DB_PATH: &str = "/var/db/ofreg";
 pub struct OfregData {
     pub cmd: String,
     pub op_file: String,
-    pub time: String,
+    pub time: u64,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, clap::Parser)]
+pub struct Query {
+    #[arg(short)]
+    pub cmd: Option<String>,
+    #[arg(short)]
+    pub file: Option<String>,
+    #[arg(short = 'b')]
+    pub time_begin: Option<u64>,
+    #[arg(short = 'e')]
+    pub time_end: Option<u64>,
+    #[arg(short, default_value_t = 10)]
+    pub num: u32,
 }

@@ -1,5 +1,6 @@
-use std::{fs::File, io::Read};
-use tracing::error;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use tracing::{error, warn};
 
 use crate::store::{OFREG_DB, insert_item};
 use crate::types::commit;
@@ -20,10 +21,17 @@ pub fn handle(data: &[u8]) -> i32 {
     //     commit.pid, commit.exec_ts, op_file_path, exe_file_path
     // );
 
+    let now = SystemTime::now();
+    let Ok(since_epoch) = now.duration_since(UNIX_EPOCH) else {
+        warn!("get current time error");
+        return 0;
+    };
+    let time = since_epoch.as_secs(); // 当前秒数（整数）
+
     let data = OfregData {
         cmd: exe_file_path,
         op_file: op_file_path,
-        time: commit.exec_ts.to_string(),
+        time,
     };
     let conn = OFREG_DB
         .lock()

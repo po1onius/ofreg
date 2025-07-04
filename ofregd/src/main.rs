@@ -1,7 +1,6 @@
 mod handle;
 mod query;
 mod store;
-mod utils;
 mod ofreg {
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -9,21 +8,14 @@ mod ofreg {
     ));
 }
 
-use std::{
-    ffi::{CStr, CString},
-    mem::MaybeUninit,
-    time::Duration,
-};
+use std::{ffi::CStr, mem::MaybeUninit, time::Duration};
 
-use anyhow::{Error, Result};
 use libbpf_rs::{
     RingBufferBuilder,
     skel::{OpenSkel, Skel, SkelBuilder},
 };
-use nix::errno::Errno;
 use tracing::{error, info};
 use tracing_appender::rolling;
-use tracing_subscriber::fmt;
 
 use ofreg_common::DB_PATH;
 
