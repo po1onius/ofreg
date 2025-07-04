@@ -11,14 +11,19 @@ use tokio::{
 
 #[derive(Debug, clap::Parser)]
 pub struct QueryArg {
+    /// 按命令查找
     #[arg(short)]
     pub cmd: Option<String>,
+    /// 按文件查找
     #[arg(short)]
     pub file: Option<String>,
+    /// 按时间段查找（开始时间）
     #[arg(short = 'b')]
     pub time_begin: Option<String>,
+    /// 按时间段查找（结束时间）
     #[arg(short = 'e')]
     pub time_end: Option<String>,
+    /// 列出记录数量
     #[arg(short, default_value_t = 10)]
     pub num: u32,
 }
