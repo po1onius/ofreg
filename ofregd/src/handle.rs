@@ -17,8 +17,8 @@ pub fn handle(data: &[u8]) -> i32 {
     let op_file_path = char_slice_to_str(&commit.op_file_path);
     let exe_file_path = char_slice_to_str(&commit.exe_file_path);
     // println!(
-    //     "pid: {}\nstart time: {}\nfilename: {}\ncommand: {}",
-    //     commit.pid, commit.exec_ts, op_file_path, exe_file_path
+    //     "pid: {}\nfilename: {}\ncommand: {}",
+    //     commit.pid, op_file_path, exe_file_path
     // );
 
     let now = SystemTime::now();

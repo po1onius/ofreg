@@ -4,7 +4,6 @@
 #include <bpf/bpf_core_read.h>
 
 #define MAX_PATH_LEN 128
-
 struct commit {
     int pid;
     char exe_file_path[MAX_PATH_LEN];
@@ -12,7 +11,8 @@ struct commit {
 };
 
 // 定义全局变量过滤目录路径
-const volatile char target_dir[MAX_PATH_LEN] = "/home/srus"; // 修改为目标目录
+const volatile char target_dir[MAX_PATH_LEN] = {}; // 修改为目标目录
+const volatile u32 target_dir_len = 0; // 修改为目标目录
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -37,21 +37,23 @@ static bool is_target_dir(const char *path) {
     return false;
 }
 
-SEC("fentry/__x64_sys_openat")
-int BPF_PROG(open_file_fentry, struct pt_regs *regs) {
+
+SEC("lsm/file_open")
+int BPF_PROG(open_file_fentry, struct file *file)
+{
     char op_file_path_buf[MAX_PATH_LEN] = {};
-    bpf_core_read_user(op_file_path_buf, MAX_PATH_LEN, PT_REGS_PARM2(regs));
+    bpf_path_d_path(&file->f_path, op_file_path_buf, MAX_PATH_LEN);
 
     if (!is_target_dir(op_file_path_buf)) {
         return 0;
     }
 
-    struct task_struct *task = (struct task_struct *)(bpf_get_current_task_btf());
 
-    struct path f_path = BPF_CORE_READ(task, mm, exe_file, f_path);
-    struct qstr d_name = BPF_CORE_READ(&f_path, dentry, d_name);
-    const unsigned char *name = BPF_CORE_READ(&d_name, name);
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 
+    struct path exec_f_path = BPF_CORE_READ(task, mm, exe_file, f_path);
+    struct qstr exec_d_name = BPF_CORE_READ(&exec_f_path, dentry, d_name);
+    const unsigned char *exec_name = BPF_CORE_READ(&exec_d_name, name);
 
     struct commit *commit = bpf_ringbuf_reserve(&shuttle, sizeof(struct commit), 0);
     if (!commit) {
@@ -60,7 +62,7 @@ int BPF_PROG(open_file_fentry, struct pt_regs *regs) {
 
     commit->pid = bpf_get_current_pid_tgid() >> 32;
     __builtin_memcpy(commit->op_file_path, op_file_path_buf, MAX_PATH_LEN);
-    bpf_core_read_str(commit->exe_file_path, MAX_PATH_LEN, name);
+    bpf_core_read_str(commit->exe_file_path, MAX_PATH_LEN, exec_name);
     bpf_ringbuf_submit(commit, 0);
 
     return 0;
