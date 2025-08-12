@@ -8,7 +8,7 @@ mod ofreg {
     ));
 }
 
-use std::{ffi::CStr, mem::MaybeUninit, time::Duration};
+use std::{ffi::CString, mem::MaybeUninit, time::Duration};
 
 use libbpf_rs::{
     RingBufferBuilder,
@@ -23,6 +23,8 @@ use handle::handle;
 use ofreg::*;
 use query::QuerySrv;
 unsafe impl plain::Plain for types::commit {}
+
+const MAX_PATH_LEN: usize = 256;
 
 fn init_log() {
     let file_appender = rolling::daily("logs", "app.log");
@@ -43,9 +45,16 @@ fn ebpf_load_run(target_dir: &str) {
         .map_err(|e| error!("{e}"))
         .unwrap();
 
-    let target_dir = unsafe { CStr::from_ptr(target_dir.as_ptr() as *const i8) };
+    // let target_dir = unsafe { CStr::from_ptr(target_dir.as_ptr() as *const i8) };
+    let target_dir = CString::new(target_dir).unwrap();
+    let target_dir_bytes = target_dir.as_bytes_with_nul();
+    let mut target_dir_c = [0i8; MAX_PATH_LEN];
+    target_dir_bytes
+        .iter()
+        .enumerate()
+        .for_each(|(i, b)| target_dir_c[i] = *b as i8);
 
-    open_skel.maps.rodata_data.target_dir = unsafe { *(target_dir.as_ptr() as *const [i8; 128]) };
+    open_skel.maps.rodata_data.target_dir = target_dir_c;
 
     let mut skel = open_skel.load().map_err(|e| error!("{e}")).unwrap();
 
@@ -100,6 +109,9 @@ fn main() {
     }
 
     let target_dir = args.last().ok_or_else(|| error!("arg error")).unwrap();
+    if target_dir.len() >= MAX_PATH_LEN {
+        panic!("path too long");
+    }
 
     ebpf_load_run(target_dir.as_str());
 }

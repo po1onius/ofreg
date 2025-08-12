@@ -3,16 +3,14 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
-#define MAX_PATH_LEN 128
+#define MAX_PATH_LEN 256
 struct commit {
     int pid;
     char exe_file_path[MAX_PATH_LEN];
     char op_file_path[MAX_PATH_LEN];
 };
 
-// 定义全局变量过滤目录路径
-const volatile char target_dir[MAX_PATH_LEN] = {}; // 修改为目标目录
-const volatile u32 target_dir_len = 0; // 修改为目标目录
+const volatile char target_dir[MAX_PATH_LEN] = "/var";
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
