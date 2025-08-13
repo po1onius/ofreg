@@ -12,4 +12,4 @@ tabled = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 chrono = "*"
-serde = { version = "*", features = ["derive"] }
+serde = { workspace = true }

@@ -7,9 +7,10 @@ use crate::types::commit;
 use ofreg_common::OfregData;
 
 pub fn handle(data: &[u8]) -> i32 {
-    let commit = plain::from_bytes::<commit>(data)
-        .map_err(|_| error!("plain parse error"))
-        .unwrap();
+    let Ok(commit) = plain::from_bytes::<commit>(data) else {
+        error!("commit parse error");
+        return 0;
+    };
     fn char_slice_to_str(data: &[i8]) -> String {
         let cstr = unsafe { std::ffi::CStr::from_ptr(data.as_ptr()) };
         cstr.to_string_lossy().into()
@@ -33,10 +34,10 @@ pub fn handle(data: &[u8]) -> i32 {
         op_file: op_file_path,
         time,
     };
-    let conn = OFREG_DB
-        .lock()
-        .map_err(|_| error!("sqlite write connect lock fetch error"))
-        .unwrap();
+    let Ok(conn) = OFREG_DB.lock() else {
+        error!("sqlite write connect lock fetch error");
+        return 0;
+    };
     let _ = insert_item(&*conn, &data);
 
     0

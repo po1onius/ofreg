@@ -4,6 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde = { version = "*", features = ["derive"] }
+serde = { workspace = true }
 tabled = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

@@ -1,21 +1,19 @@
-use anyhow::{Result, anyhow};
+use crate::config::CONFIG;
+use anyhow::Result;
 use ofreg_common::{OfregData, TABLE_NAME};
 use rusqlite::Connection;
 use std::sync::{LazyLock, Mutex};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 pub const DB_FILE: &str = "/var/db/ofreg/ofreg.db";
-const DB_IGNORE_PATH_PREFIX: [&str; 2] = ["/var/db/ofreg/", "/var/cache/fontconfig/"];
 
 pub static OFREG_DB: LazyLock<Mutex<Connection>> = LazyLock::new(|| {
-    let conn = db_open()
-        .map_err(|_| error!("connection open error"))
-        .unwrap();
+    let conn = db_open().expect("connection open error");
     Mutex::new(conn)
 });
 
 fn is_ignore(path2: &str) -> bool {
-    for ignore_path in DB_IGNORE_PATH_PREFIX {
+    for ignore_path in &CONFIG.get().expect("config not init").ignore_path {
         if let Some(idx) = path2.find(ignore_path)
             && idx == 0
         {
@@ -26,19 +24,14 @@ fn is_ignore(path2: &str) -> bool {
 }
 
 pub fn db_open() -> Result<Connection> {
-    let conn_w = Connection::open(DB_FILE).map_err(|e| {
-        warn!("{e}");
-        anyhow!("")
-    })?;
-    let _ = conn_w
-        .execute_batch(
-            "PRAGMA journal_mode=WAL;
+    let conn_w = Connection::open(DB_FILE)?;
+    conn_w.execute_batch(
+        "PRAGMA journal_mode=WAL;
          PRAGMA synchronous=NORMAL;
          PRAGMA cache_size=-100000;
          PRAGMA busy_timeout=5000;
          PRAGMA foreign_keys=OFF;",
-        )
-        .map_err(|e| warn!("{e}"));
+    )?;
 
     let query_exist = format!(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{}'",
@@ -48,17 +41,9 @@ pub fn db_open() -> Result<Connection> {
         "CREATE TABLE {} (cmd TEXT, op_file TEXT, time INTEGER)",
         TABLE_NAME
     );
-    let table_count = conn_w
-        .query_row(&query_exist, (), |row| row.get::<_, i32>(0))
-        .map_err(|e| {
-            warn!("{e}");
-            anyhow!("")
-        })?;
+    let table_count = conn_w.query_row(&query_exist, (), |row| row.get::<_, i32>(0))?;
     if table_count == 0 {
-        conn_w.execute(&create_table, ()).map_err(|e| {
-            warn!("{e}");
-            anyhow!("")
-        })?;
+        conn_w.execute(&create_table, ())?;
     }
     info!("open db write connection");
     Ok(conn_w)
@@ -67,6 +52,15 @@ pub fn db_open() -> Result<Connection> {
 pub fn insert_item(conn: &Connection, item: &OfregData) -> Result<()> {
     if is_ignore(&item.op_file) {
         //print!("ignore: {}", item.op_file);
+        return Ok(());
+    }
+
+    if CONFIG
+        .get()
+        .expect("config not init")
+        .ignore_cmd
+        .contains(&item.cmd)
+    {
         return Ok(());
     }
 

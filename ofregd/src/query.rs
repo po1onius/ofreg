@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use nix::unistd::Group;
 use std::{
-    fs, io,
+    fs,
     os::unix::fs::{PermissionsExt, chown},
 };
 use tokio::{
@@ -20,10 +20,7 @@ pub struct QuerySrv {
 
 impl QuerySrv {
     pub async fn new_conn() -> Result<Self> {
-        let db_conn = Connection::open(DB_FILE).await.map_err(|e| {
-            warn!("db open connection error: {}", e);
-            anyhow!("")
-        })?;
+        let db_conn = Connection::open(DB_FILE).await?;
 
         let _ = db_conn
             .call(|conn| {
@@ -34,24 +31,17 @@ impl QuerySrv {
                 PRAGMA busy_timeout=1000;",
                 )
             })
-            .await
-            .map_err(|e| {
-                warn!(
-                    "db connection init settings error, may cause performance matter: {}",
-                    e.to_string()
-                )
-            });
+            .await?;
 
         info!("db connect and init");
 
         Ok(Self { db_conn })
     }
 
-    pub async fn srv(&self) {
+    pub async fn srv(&self) -> Result<()> {
         fs::remove_file(SOCK_PATH).ok();
-        let listener = UnixListener::bind(SOCK_PATH)
-            .map_err(|_| error!("unix socket path bind error"))
-            .unwrap();
+        let listener =
+            UnixListener::bind(SOCK_PATH).map_err(|_| anyhow!("unix socket path bind error"))?;
 
         if let Ok(Some(user_group)) = Group::from_name("users") {
             let _ = chown(SOCK_PATH, None, Some(user_group.gid.into()))
@@ -63,25 +53,32 @@ impl QuerySrv {
         }
 
         loop {
-            let (mut stream, _) = listener
+            let Ok((mut stream, _)) = listener
                 .accept()
                 .await
                 .map_err(|e| error!("{}", e.to_string()))
-                .unwrap();
+            else {
+                continue;
+            };
 
             let db_conn = self.db_conn.clone();
             tokio::spawn(async move {
-                let payload_len = stream
+                let Ok(payload_len) = stream
                     .read_u32()
                     .await
                     .map_err(|e| error!("{}", e.to_string()))
-                    .unwrap();
+                else {
+                    return;
+                };
                 let mut buf = vec![0u8; payload_len as usize];
-                stream
+                if stream
                     .read_exact(buf.as_mut_slice())
                     .await
                     .map_err(|e| error!("{}", e.to_string()))
-                    .unwrap();
+                    .is_err()
+                {
+                    return;
+                }
 
                 let Ok(query_item) = String::from_utf8(buf) else {
                     warn!("cli send bad query cmd");
@@ -114,9 +111,13 @@ impl QuerySrv {
                 {
                     Ok(result) => {
                         if let Ok(data) = serde_json::to_string(&result) {
-                            // println!("{data}");
-                            write_frame(&mut stream, data.as_bytes()).await;
-                            stream.write_u32(0).await.piperr();
+                            if write_frame(&mut stream, data.as_bytes())
+                                .await
+                                .map_err(|e| error!("success query but response error => {}", e))
+                                .is_err()
+                            {
+                                return;
+                            };
                             info!("response to cli query result");
                         } else {
                             warn!("query result serde err");
@@ -124,35 +125,22 @@ impl QuerySrv {
                     }
                     Err(e) => {
                         warn!("{e}");
-                        stream.write_u32(0).await.piperr();
                     }
                 }
+                stream
+                    .write_u32(0)
+                    .await
+                    .map_err(|e| error!("write finish flag error => {}", e))
+                    .err();
             });
         }
     }
 }
 
-trait IoErrHandle {
-    fn piperr(&self) {
-        panic!("custom unwrap");
-    }
-}
-
-impl<T> IoErrHandle for Result<T, io::Error> {
-    fn piperr(&self) {
-        if let Err(e) = self {
-            if e.kind() != io::ErrorKind::BrokenPipe {
-                error!("{e}");
-                panic!();
-            }
-            warn!("{e}");
-        }
-    }
-}
-
-async fn write_frame(stream: &mut UnixStream, data: &[u8]) {
-    stream.write_u32(data.len() as u32).await.piperr();
-    stream.write_all(data).await.piperr();
+async fn write_frame(stream: &mut UnixStream, data: &[u8]) -> anyhow::Result<()> {
+    stream.write_u32(data.len() as u32).await?;
+    stream.write_all(data).await?;
+    Ok(())
 }
 
 fn sqlcat(query: &Query) -> String {

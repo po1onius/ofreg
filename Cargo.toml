@@ -17,3 +17,4 @@ tracing-appender = "*"
 serde_json = "*"
 tabled = "*"
 clap = "*"
+serde = { version = "*", features = ["derive"] }
